@@ -10,7 +10,7 @@ import functools
 import threading
 
 # Function to record audio when spacebar is pressed
-def record_audio(path, filename):
+def record_audio_old(path, filename):
     # Set the parameters for the audio stream
     chunk = 1024
     sample_format = pyaudio.paInt16
@@ -94,8 +94,111 @@ def record_audio(path, filename):
     # Start the Pyglet event loop
     pyglet.app.run()
 
+# Function to record audio when spacebar is pressed, with a prompt
+def record_audio(path, filename):
+    # Set the parameters for the audio stream
+    chunk = 1024
+    sample_format = pyaudio.paInt16
+    channels = 1
+    fs = 44100
+    
+    # Initialize the PyAudio object
+    p = pyaudio.PyAudio()
+    
+    # Open the audio stream
+    # stream = p.open(format=sample_format,
+    #                 channels=channels,
+    #                 rate=fs,
+    #                 frames_per_buffer=chunk,
+    #                 input=True)
+   
+    # frames = []
+    frames = []
+    
+    # Create a key event handler for starting and stopping recording
+    def on_key_press(symbol, modifiers):
+        if symbol == pyglet.window.key.SPACE:
+            # print("Recording started")
+            # global stream 
+            # stream = p.open(format=sample_format,
+            #         channels=channels,
+            #         rate=fs,
+            #         frames_per_buffer=chunk,
+            #         input=True)     
+            # pyglet.clock.schedule_interval(on_update, 1 / 60.0)
+            # Start the countdown timer
+            count = 3
+            def countdown(dt):
+                nonlocal count
+                count -= 1
+                label.text = f"Recording will start in {count} seconds\nRelease SPACEBAR to stop recording"
+                if count == 0:
+                    pyglet.clock.unschedule(countdown)
+                    pyglet.clock.schedule_interval(on_update, 1 / 60.0)
+                    label.text = "Start speaking now..."
+                    print("Recording...")
+            pyglet.clock.schedule_interval(countdown, 1)
+
+            global stream 
+            stream = p.open(format=sample_format,
+                    channels=channels,
+                    rate=fs,
+                    frames_per_buffer=chunk,
+                    input=True)     
+            pyglet.clock.schedule_interval(on_update, 1 / 60.0)
+    
+    def on_key_release(symbol, modifiers):
+        if symbol == pyglet.window.key.SPACE:
+            print("Recording stopped")
+            pyglet.clock.unschedule(on_update)
+            # Stop and close the audio stream
+            stream.stop_stream()
+            stream.close()
+            
+            # Terminate the PyAudio object
+            p.terminate()
+            
+            # Save the recorded audio as a WAV file
+            file_path = os.path.join(path, filename)
+            wf = wave.open(file_path, 'wb')
+            wf.setnchannels(channels)
+            wf.setsampwidth(p.get_sample_size(sample_format))
+            wf.setframerate(fs)
+            wf.writeframes(b''.join(frames))
+            wf.close()
+
+            window.close()
+    
+    # Create a clock event handler for recording audio
+    def on_update(dt):
+        data = stream.read(chunk)
+        frames.append(data)
+    
+    # Create a window and attach the key event handlers 
+    window = pyglet.window.Window()
+    window.on_key_press = on_key_press
+    window.on_key_release = on_key_release
 
 
+    # Creating the label to display the message
+    label_text = "Press and hold SPACEBAR to START recording\nRelease SPACEBAR to STOP recording"
+    label = pyglet.text.Label(label_text,
+                          font_name="Arial",
+                          font_size=24,
+                          x=window.width//2, y=window.height//2,
+                          multiline=True,
+                          width=window.width,
+                          height=window.height,
+                          anchor_x="center", anchor_y="center")
+
+    # Define the on_draw function
+    @window.event
+    def on_draw():
+        window.clear()
+        label.draw()
+    
+    # Start the Pyglet event loop
+    pyglet.app.run()
 
 # # Function to record audio with a fixed duration
 def record_audio_with_fixed_duration(path, filename, duration): ## exception handling
